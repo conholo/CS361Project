@@ -1,0 +1,136 @@
+#pragma kernel CSWorley
+#pragma kernel CSNormalize
+
+static const int ThreadGroupCount = 8;
+static const int MinMaxAccuracy = 10000000;
+
+uint _Resolution;
+RWTexture3D<float4> _Result;
+RWStructuredBuffer<int> _MinMax;
+
+StructuredBuffer<float3> _DivisionA;
+StructuredBuffer<float3> _DivisionB;
+StructuredBuffer<float3> _DivisionC;
+
+int _CellCountA;
+int _CellCountB;
+int _CellCountC;
+
+float4 _ChannelMask;
+float _Persistence;
+bool _Invert;
+int _Tile;
+
+static const int3 CubeOffsets[] =
+{
+    // center
+    int3(0,0,0),
+    // front face
+    int3(0,0,1),
+    int3(-1,1,1),
+    int3(-1,0,1),
+    int3(-1,-1,1),
+    int3(0,1,1),
+    int3(0,-1,1),
+    int3(1,1,1),
+    int3(1,0,1),
+    int3(1,-1,1),
+    // back face
+    int3(0,0,-1),
+    int3(-1,1,-1),
+    int3(-1,0,-1),
+    int3(-1,-1,-1),
+    int3(0,1,-1),
+    int3(0,-1,-1),
+    int3(1,1,-1),
+    int3(1,0,-1),
+    int3(1,-1,-1),
+    // ring around center
+    int3(-1,1,0),
+    int3(-1,0,0),
+    int3(-1,-1,0),
+    int3(0,1,0),
+    int3(0,-1,0),
+    int3(1,1,0),
+    int3(1,0,0),
+    int3(1,-1,0)
+};
+
+float MaxComponent(float3 vec)
+{
+    return max(vec.x, max(vec.y, vec.z));
+}
+
+float MinComponent(float3 vec)
+{
+    return min(vec.x, min(vec.y, vec.z));
+}
+
+float Worley(StructuredBuffer<float3> points, int cellCount, float3 samplePosition)
+{
+    samplePosition = (samplePosition * _Tile) % 1;
+    const int3 cellID = floor(samplePosition * cellCount);
+    float minSquareDistance = 1;
+
+    for (int cellOffsetIndex = 0; cellOffsetIndex < 27; cellOffsetIndex ++)
+    {
+        const int3 adjacentID = cellID + CubeOffsets[cellOffsetIndex];
+        
+        if (MinComponent(adjacentID) == -1 || MaxComponent(adjacentID) == cellCount)
+        {
+            const int3 wrappedID = (adjacentID + cellCount) % (uint3)cellCount;
+            const int adjCellIndex = wrappedID.x + cellCount * (wrappedID.y + wrappedID.z * cellCount);
+
+            const float3 wrappedPoint = points[adjCellIndex];
+            
+            for (int wrapOffsetIndex = 0; wrapOffsetIndex < 27; wrapOffsetIndex ++)
+            {
+                const float3 sampleOffset = (samplePosition - (wrappedPoint + CubeOffsets[wrapOffsetIndex]));
+                minSquareDistance = min(minSquareDistance, dot(sampleOffset, sampleOffset));
+            }
+        }
+        else
+        {
+            const int adjacentCellIndex = adjacentID.x + cellCount * (adjacentID.y + adjacentID.z * cellCount);
+            const float3 sampleOffset = samplePosition - points[adjacentCellIndex];
+            minSquareDistance = min(minSquareDistance, dot(sampleOffset, sampleOffset));
+        }
+    }
+    return sqrt(minSquareDistance); 
+}
+
+
+[numthreads(ThreadGroupCount, ThreadGroupCount, ThreadGroupCount)]
+void CSWorley (uint3 id : SV_DispatchThreadID)
+{
+    const float3 samplePosition = id / (float) _Resolution;
+
+    const float layerA = Worley(_DivisionA, _CellCountA, samplePosition);
+    const float layerB = Worley(_DivisionB, _CellCountB, samplePosition);
+    const float layerC = Worley(_DivisionC, _CellCountC, samplePosition);
+
+    float sum = layerA + (layerB * _Persistence) + (layerC * _Persistence * _Persistence);
+    const float maxValue = 1 + _Persistence + (_Persistence * _Persistence);
+
+    sum /= maxValue;
+
+    if(_Invert)
+        sum = 1 - sum;
+
+    int value = (int) (sum * MinMaxAccuracy);
+    InterlockedMin(_MinMax[0], value);
+    InterlockedMax(_MinMax[1], value);
+    
+    _Result[id] = _Result[id] * (1 - _ChannelMask) + sum * _ChannelMask;
+}
+
+[numthreads(ThreadGroupCount, ThreadGroupCount, ThreadGroupCount)]
+void CSNormalize (uint3 id : SV_DispatchThreadID)
+{
+    float minVal = (float)_MinMax[0] / MinMaxAccuracy;
+    float maxVal = (float)_MinMax[1] / MinMaxAccuracy;
+    
+    float4 normalizedVal = (_Result[id] - minVal) / (maxVal - minVal);
+
+    _Result[id] = _Result[id] * (1 - _ChannelMask) + normalizedVal * _ChannelMask;
+}

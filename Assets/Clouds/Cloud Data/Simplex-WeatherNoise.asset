@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 92d854a8d478443fb0b7bb8872121014, type: 3}
+  m_Name: Simplex-WeatherNoise
+  m_EditorClassIdentifier: 
+  _seed: 17
+  _layerCount: 4
+  _scale: 5.8
+  _lacunarity: 2.46
+  _persistence: 0.5
+  _offset: {x: -54.78, y: 0}

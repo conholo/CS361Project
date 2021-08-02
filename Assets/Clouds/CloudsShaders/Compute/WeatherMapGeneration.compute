@@ -1,0 +1,48 @@
+#pragma kernel CSMain
+
+#include "SimplexNoise.compute"
+
+static const int ThreadCount = 16;
+
+struct WeatherMapNoiseSettings
+{
+    int Seed;
+    int LayerCount;
+    float Scale;
+    float Lacunarity;
+    float Persistence;
+    float2 Offset;
+};
+
+
+StructuredBuffer<WeatherMapNoiseSettings> _WeatherMapNoiseSettings;
+StructuredBuffer<float4> _Offsets;
+
+uint _Resolution;
+RWTexture2D<float4> _Result;
+
+[numthreads(ThreadCount, ThreadCount, 1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    const WeatherMapNoiseSettings noiseSettings = _WeatherMapNoiseSettings[0];
+    
+    float amplitude = 1;
+    float frequency = noiseSettings.Scale;
+
+    float mapValue = 0;
+
+    const float2 samplePosition = float2(id.x, id.y) / _Resolution;
+
+    for(int layer = 0; layer < noiseSettings.LayerCount; layer++)
+    {
+        // Noise [0...1]
+        const float noise = snoise((samplePosition + noiseSettings.Offset / 100) * frequency + _Offsets[layer].xy) * 0.5 + 0.5;
+        mapValue += noise * amplitude;
+        amplitude *= noiseSettings.Persistence;
+        frequency *= noiseSettings.Lacunarity;
+    }
+
+    mapValue /= noiseSettings.LayerCount;
+
+    _Result[id.xy] = mapValue;
+}

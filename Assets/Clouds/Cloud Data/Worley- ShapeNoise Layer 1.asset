@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3dc9352487f843f1b03516b032a2c601, type: 3}
+  m_Name: Worley- ShapeNoise Layer 1
+  m_EditorClassIdentifier: 
+  _seed: 0
+  _divisionCountA: 4
+  _divisionCountB: 10
+  _divisionCountC: 15
+  _persistence: 5.4
+  _tile: 2
+  _invert: 1
